@@ -187,12 +187,16 @@ public class Interpreter {
 				chapters.add(chap);
 			}
 			else if (element.className().equals("userstuff")){
-				chapters.get(chapters.size() - 1).Body = element.html(); //get last added chapter, set body
+				if(!chapters.isEmpty()) { // index oob guard
+					chapters.get(chapters.size() - 1).Body = element.html(); //get last added chapter, set body
+				}
 			} else if(element.id().contains("endnotes")){
-				// End notes come in form endnotes[chap num], indexed from 1.
-				// This removes endnotes, parses to int, subtracts 1.
 				int chapNo = Integer.parseInt(element.id().replace("endnotes", "")) - 1;
-				chapters.get(chapNo).EndNotes = element.getElementsByClass("userstuff").first().html();
+				if(chapNo >= 0 && chapNo < chapters.size()) {
+					Element userstuff = element.getElementsByClass("userstuff").first();
+					if(userstuff != null)
+						chapters.get(chapNo).EndNotes = userstuff.html();
+				}
 			}
 		}
 		return chapters.toArray(new WorkChapter[0]);
@@ -205,9 +209,15 @@ public class Interpreter {
 		WorkChapter chapter = new WorkChapter();
 		
 		chapter.Title = doc.getElementsByClass("title").last().text();
-		
-		chapter.ChapterIndex = Integer.parseInt(chapter.Title.split(" ")[1].replace(":", ""));
-		chapter.Title = chapter.Title.replaceFirst("Chapter [0-9]*: ", "");
+
+		// try to parse chapter index from title, default to 1 if format doesn't match
+		try {
+			chapter.ChapterIndex = Integer.parseInt(chapter.Title.split(" ")[1].replace(":", ""));
+			chapter.Title = chapter.Title.replaceFirst("Chapter [0-9]*: ", "");
+		} catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+			chapter.ChapterIndex = 1;
+			// title stays bc it's not in "Chapter N: Title" format
+		}
 		
 		chapter.Body = doc.getElementById("chapters").children().first().getElementsByAttributeValue("role", "article").first().html();
 		//this hidden text is just randomly in the fucking chapter
@@ -215,18 +225,26 @@ public class Interpreter {
 		chapter.Body.replaceFirst("<h3 class=\"landmark heading\" id=\"work\">Chapter Text<\\/h3>", "");
 		
 		Elements prefaces = doc.getElementsByClass("chapter preface group");
-		
+
 		Element summary = prefaces.first().getElementById("summary");
-		if(summary != null)
-			chapter.Summary = summary.getElementsByClass("userstuff").first().html();
+		if(summary != null) {
+			Element userstuff = summary.getElementsByClass("userstuff").first();
+			if(userstuff != null)
+				chapter.Summary = userstuff.html();
+		}
+
 		Element startNotes = prefaces.first().getElementById("notes");
 		if(startNotes != null) {
-			// regex: <h3 class="heading">Notes:<\/h3>
-			// see regex comment above... this one shows, tho.
-			chapter.StartNotes = startNotes.html().replaceFirst("<h3 class=\"heading\">Notes:<\\/h3>", "");
+			Element userstuff = startNotes.getElementsByClass("userstuff").first();
+			if(userstuff != null)
+				chapter.StartNotes = userstuff.html().replaceFirst("<h3 class=\"heading\">Notes:<\\/h3>", "");
 		}
-		if(prefaces.size() == 2)
-			chapter.EndNotes = prefaces.last().getElementsByClass("userstuff").first().html();
+
+		if(prefaces.size() == 2) {
+			Element userstuff = prefaces.last().getElementsByClass("userstuff").first();
+			if(userstuff != null)
+				chapter.EndNotes = userstuff.html();
+		}
 		
 		return chapter;
 	}

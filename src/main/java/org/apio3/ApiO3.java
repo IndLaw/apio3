@@ -43,25 +43,58 @@ public class ApiO3 {
 	
 	// Downloads all chapter data of a work, body and all
 	public static WorkChapter[] DownloadWholeWork(String workId){
-		
+
 		String urlWork = "https://archiveofourown.org/works/" + workId + "?view_adult=true";
 		String rawHtml = http.Get(urlWork);
 		if(rawHtml == null)
 			return null;
-		
-		String urlNaviagtion = "https://archiveofourown.org/works/" + workId + "/navigate";
-		String rawNavigation = http.Get(urlNaviagtion);
+
+		String urlNavigation = "https://archiveofourown.org/works/" + workId + "/navigate?view_adult=true";
+		String rawNavigation = http.Get(urlNavigation);
 		if(rawNavigation == null)
 			return null;
 		WorkChapter[] chapterMetadatas = Interpreter.GetTitlesDatesID(rawNavigation);
-		
+
+		// single-chapter works, download directly from work page
+		if(chapterMetadatas.length == 1){
+			String urlDownload = Interpreter.GetDownloadUrl(rawHtml) + "?view_adult=true";
+			String rawHtmlDownload = http.Get(urlDownload);
+			if(rawHtmlDownload == null)
+				return null;
+			WorkChapter[] chapters = Interpreter.GetWorkContents(rawHtmlDownload);
+
+			if(chapters.length == 0){
+				// single-chapter works have no meta group dividers in download html
+				// parse body directly from chapters div
+				WorkChapter chapter = new WorkChapter();
+				chapter.ChapterIndex = 1;
+				chapter.Downloaded = true;
+
+				org.jsoup.nodes.Document doc = org.jsoup.Jsoup.parse(rawHtmlDownload);
+				org.jsoup.nodes.Element chaptersDiv = doc.getElementById("chapters");
+				if(chaptersDiv != null){
+					org.jsoup.nodes.Element userstuff = chaptersDiv.getElementsByClass("userstuff").first();
+					if(userstuff != null)
+						chapter.Body = userstuff.html();
+				}
+				chapters = new WorkChapter[]{ chapter };
+			}
+			if(chapters[0].Title == null) {
+				chapters[0].Title = "Chapter 1";
+			}
+			chapters[0].ChapterID = chapterMetadatas[0].ChapterID;
+			chapters[0].WorkID = chapterMetadatas[0].WorkID;
+			chapters[0].UploadDate = chapterMetadatas[0].UploadDate;
+			return chapters;
+		}
+
+		// multi-chapter works
 		String urlDownload = Interpreter.GetDownloadUrl(rawHtml) + "?view_adult=true";
 		String rawHtmlDownload = http.Get(urlDownload);
 		if(rawHtmlDownload == null)
 			return null;
 		WorkChapter[] chapters = Interpreter.GetWorkContents(rawHtmlDownload);
-		
-		// Merge the two
+
 		for(int i = 0; i < chapterMetadatas.length; i++){
 			chapters[i].ChapterID = chapterMetadatas[i].ChapterID;
 			chapters[i].WorkID = chapterMetadatas[i].WorkID;

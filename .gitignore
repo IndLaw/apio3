@@ -1,10 +1,14 @@
+# Ignore Build Artifacts
 .gradle
 build/
+/.gradle
+/local.properties
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
 
 ### IntelliJ IDEA ###
+.idea/
 .idea/modules.xml
 .idea/jarRepositories.xml
 .idea/compiler.xml
